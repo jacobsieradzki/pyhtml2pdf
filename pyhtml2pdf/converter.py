@@ -1,6 +1,6 @@
-import sys
 import json
 import base64
+from time import sleep
 
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
@@ -22,6 +22,9 @@ def convert(
     power: int = 0,
     install_driver: bool = True,
     print_options: dict = {},
+    render_wait: float = 0,
+    wait_for_element_type: str = By.TAG_NAME,
+    wait_for_element_value: str = "html",
 ):
     """
     Convert a given html file or website into PDF
@@ -36,7 +39,14 @@ def convert(
     """
 
     result = __get_pdf_from_html(
-        source, timeout, install_driver, print_options)
+        source,
+        timeout,
+        install_driver,
+        print_options,
+        render_wait,
+        wait_for_element_type,
+        wait_for_element_value,
+    )
 
     if compress:
         __compress(result, target, power)
@@ -58,7 +68,13 @@ def __send_devtools(driver, cmd, params={}):
 
 
 def __get_pdf_from_html(
-    path: str, timeout: int, install_driver: bool, print_options: dict
+    path: str,
+    timeout: int,
+    install_driver: bool,
+    print_options: dict,
+    render_wait: float,
+    wait_for_element_type: str,
+    wait_for_element_value: str,
 ):
     webdriver_options = Options()
     webdriver_prefs = {}
@@ -82,8 +98,15 @@ def __get_pdf_from_html(
 
     try:
         WebDriverWait(driver, timeout).until(
-            staleness_of(driver.find_element(by=By.TAG_NAME, value="html"))
+            staleness_of(
+                driver.find_element(
+                    by=wait_for_element_type,
+                    value=wait_for_element_value,
+                )
+            )
         )
+        if render_wait > 0:
+            sleep(render_wait)
     except TimeoutException:
         calculated_print_options = {
             "landscape": False,
@@ -92,7 +115,6 @@ def __get_pdf_from_html(
             "preferCSSPageSize": True,
         }
         calculated_print_options.update(print_options)
-        result = __send_devtools(
-            driver, "Page.printToPDF", calculated_print_options)
+        result = __send_devtools(driver, "Page.printToPDF", calculated_print_options)
         driver.quit()
         return base64.b64decode(result["data"])
